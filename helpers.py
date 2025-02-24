@@ -4,6 +4,7 @@ from codegen.sdk.codebase.config import CodebaseConfig
 from data import LinearLabels, LinearIssueUpdateEvent
 import os
 import logging
+import tempfile
 
 
 logging.basicConfig(level=logging.INFO)
@@ -80,5 +81,9 @@ def has_codegen_label(*args, **kwargs):
 def create_codebase(repo_name: str, language: ProgrammingLanguage):
     config = CodebaseConfig()
     config.secrets.github_token = os.environ["GITHUB_TOKEN"]
-
-    return Codebase.from_repo(repo_name, language=language, tmp_dir="/root", config=config)
+    
+    # Use a temporary directory in the user's home directory instead of /root
+    tmp_dir = tempfile.gettempdir()
+    
+    logger.info(f"Using temporary directory: {tmp_dir}")
+    return Codebase.from_repo(repo_name, language=language, tmp_dir=tmp_dir, config=config)

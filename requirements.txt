@@ -1,0 +1,7 @@
+fastapi==0.103.1
+uvicorn==0.23.2
+pyngrok==7.0.0
+python-dotenv==1.0.0
+pydantic==2.3.0
+codegen==v0.26.3
+requests==2.31.0 
