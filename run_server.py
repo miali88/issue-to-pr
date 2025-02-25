@@ -26,12 +26,18 @@ def register_linear_webhook(webhook_url):
         logger.error("LINEAR_API_TOKEN not found in environment variables")
         return False
     
+    # Get Linear team ID from environment
+    linear_team_id = os.environ.get("LINEAR_TEAM_ID")
+    if not linear_team_id:
+        logger.error("LINEAR_TEAM_ID not found in environment variables")
+        return False
+    
     # GraphQL endpoint
     url = "https://api.linear.app/graphql"
     
     # Headers for authentication
     headers = {
-        "Authorization": f"Bearer {linear_api_token}",
+        "Authorization": f"{linear_api_token}",
         "Content-Type": "application/json"
     }
     
@@ -68,10 +74,11 @@ def register_linear_webhook(webhook_url):
         
         # If webhook doesn't exist, create it
         mutation = """
-        mutation CreateWebhook($url: String!, $label: String!) {
+        mutation CreateWebhook($url: String!, $label: String!, $teamId: String!) {
             webhookCreate(input: {
                 url: $url
                 label: $label
+                teamId: $teamId
                 resourceTypes: [Issue]
                 enabled: true
             }) {
@@ -87,7 +94,8 @@ def register_linear_webhook(webhook_url):
         
         variables = {
             "url": webhook_url,
-            "label": "Codegen Bot Webhook"
+            "label": "Codegen Bot Webhook",
+            "teamId": linear_team_id
         }
         
         response = requests.post(
@@ -107,10 +115,15 @@ def register_linear_webhook(webhook_url):
         else:
             errors = data.get("errors", [])
             logger.error(f"Failed to register webhook with Linear: {errors}")
+            # Log the full response for debugging
+            logger.error(f"Full response: {json.dumps(data, indent=2)}")
             return False
             
     except Exception as e:
         logger.error(f"Error registering webhook with Linear: {str(e)}")
+        # Log more details about the error for debugging
+        if hasattr(e, 'response') and hasattr(e.response, 'text'):
+            logger.error(f"Response details: {e.response.text}")
         return False
 
 def run_fastapi_server():
@@ -141,7 +154,7 @@ def run_ngrok():
     Returns:
         tuple: (ngrok_process, webhook_url)
     """
-    logger.info("Starting Ngrok tunnel...")
+    logger.info("Starting Ngrok tunnel with static subdomain 'internally-wise-spaniel'...")
     
     # Use subprocess to capture the output
     ngrok_process = subprocess.Popen(
@@ -176,7 +189,7 @@ def run_ngrok():
     stderr_thread.start()
     
     # Wait a bit for ngrok to start and for the webhook URL to be extracted
-    max_wait = 10  # seconds
+    max_wait = 15  # seconds (increased from 10)
     wait_interval = 0.5  # seconds
     for _ in range(int(max_wait / wait_interval)):
         if webhook_url:
@@ -185,8 +198,11 @@ def run_ngrok():
     
     if webhook_url:
         logger.info(f"Successfully extracted webhook URL: {webhook_url}")
+        logger.info(f"This URL will be consistent across restarts due to the static subdomain")
     else:
         logger.warning("Could not extract webhook URL from ngrok output")
+        logger.warning("There might be an issue with the ngrok service or the subdomain might be in use")
+        logger.warning("Check if the subdomain 'internally-wise-spaniel' is available or try a different one")
     
     return ngrok_process, webhook_url
 

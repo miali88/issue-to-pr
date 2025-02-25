@@ -22,16 +22,16 @@ def start_ngrok_tunnel():
         # Define port - this should match the port in app.py
         port = 8000
         
-        # Get subdomain from environment variable or use default
-        subdomain = os.environ.get("NGROK_SUBDOMAIN")
+        # Use static subdomain "internally-wise-spaniel"
+        subdomain = "internally-wise-spaniel"
         
-        # Configure tunnel options
-        options = {"addr": f"http://localhost:{port}"}
-        if subdomain:
-            options["subdomain"] = subdomain
-            logger.info(f"Using custom subdomain: {subdomain}")
-        else:
-            logger.info("Using random subdomain (set NGROK_SUBDOMAIN env var for a custom one)")
+        # Configure tunnel options with static subdomain
+        options = {
+            "addr": f"http://localhost:{port}",
+            "subdomain": subdomain
+        }
+        
+        logger.info(f"Using static subdomain: {subdomain}")
         
         # Start the tunnel
         http_tunnel = ngrok.connect(**options)
