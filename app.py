@@ -18,14 +18,16 @@ import json
 # Load environment variables from .env file
 load_dotenv()
 
-# Get GitHub token from environment variables
-github_token = os.environ.get("GITHUB_TOKEN")
-if not github_token:
-    logger.warning("GITHUB_TOKEN not found in environment variables")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+# Get GitHub token from environment variables
+github_token = os.environ.get("GITHUB_TOKEN")
+if not github_token:
+    logger.warning("GITHUB_TOKEN not found in environment variables")
 
 app = FastAPI(title="Linear-Bot")
 
