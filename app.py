@@ -18,8 +18,10 @@ import json
 # Load environment variables from .env file
 load_dotenv()
 
-# Force set the GitHub token to the correct value
-os.environ["GITHUB_TOKEN"] = "***REMOVED***"
+# Get GitHub token from environment variables
+github_token = os.environ.get("GITHUB_TOKEN")
+if not github_token:
+    logger.warning("GITHUB_TOKEN not found in environment variables")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -51,7 +53,6 @@ async def startup_event():
     get_codebase()
     
     # Debug: Print the token being used (first few chars only)
-    github_token = os.getenv("GITHUB_TOKEN")
     if github_token:
         print("TOKENNENEN", github_token)
         token_preview = github_token[:10] + "..." if len(github_token) > 10 else "too_short"
