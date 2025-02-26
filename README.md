@@ -2,13 +2,35 @@
 
 This project demonstrates how to deploy an agentic bot that automatically creates GitHub Pull Requests from Linear tickets. The bot leverages Linear's webhook system to listen for ticket updates and uses AI to generate corresponding GitHub PRs with appropriate code changes.
 
+## Features
+
+- Automatically processes Linear tickets with the "Codegen" label
+- Uses AI to analyze the codebase and implement requested changes
+- Creates GitHub Pull Requests with the implemented changes
+- Provides internet search capabilities to research documentation and best practices
+- Comments on Linear tickets with progress updates and PR links
+
+### Enhanced AI Capabilities
+
+The bot includes several custom tools to enhance its capabilities:
+
+1. **WebSearchTool**: Built-in tool for basic internet search
+2. **CustomWebSearchTool**: Enhanced search tool that provides more detailed results
+3. **CustomDocumentationTool**: Specialized tool for fetching library and API documentation
+
+These tools allow the AI to:
+- Research necessary documentation when implementing features
+- Look up best practices and coding patterns
+- Find examples and reference implementations
+- Stay up-to-date with the latest APIs and libraries
+
 ## Prerequisites
 
 Before running this application, you'll need the following API tokens and credentials:
 
 - GitHub API Token
 - Linear API Token
-- Anthropic API Token
+- Anthropic API Token (required for internet search capabilities)
 - Linear Signing Key
 - Linear Team ID
 - Ngrok auth token (sign up at [ngrok.com](https://ngrok.com))
@@ -25,7 +47,7 @@ Before running this application, you'll need the following API tokens and creden
    ```env
    GITHUB_TOKEN=your_github_token
    LINEAR_API_TOKEN=your_linear_token
-   ANTHROPIC_API_KEY=your_anthropic_token
+   ANTHROPIC_API_KEY=your_anthropic_token  # Required for internet search capabilities
    LINEAR_SIGNING_KEY=your_linear_signing_key
    LINEAR_TEAM_ID=your_team_id
    NGROK_AUTH_TOKEN=your_ngrok_auth_token
@@ -39,13 +61,6 @@ Before running this application, you'll need the following API tokens and creden
    ```bash
    ngrok authtoken your_ngrok_auth_token
    ```
-
-## Features
-
-- Automatic PR creation from Linear tickets
-- AI-powered code generation using an agentic approach
-- Webhook integration with Linear
-- Local FastAPI server with Ngrok for secure tunneling
 
 ## Usage
 

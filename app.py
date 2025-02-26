@@ -2,7 +2,9 @@ from codegen import Codebase, CodeAgent
 from codegen.extensions.clients.linear import LinearClient
 from codegen.shared.enums.programming_language import ProgrammingLanguage
 from codegen.extensions.tools.github.create_pr import create_pr
-from helpers import create_codebase, format_linear_message, has_codegen_label, process_update_event, get_linear_issue_id, manually_create_pr, manually_clone_repository
+from codegen.extensions.langchain.agent import create_agent_with_tools
+from helpers import create_codebase, format_linear_message, has_codegen_label, process_update_event, get_linear_issue_id, manually_create_pr, manually_clone_repository, log_agent_progress
+from custom_tools import CustomWebSearchTool, CustomDocumentationTool
 
 from fastapi import FastAPI, Request, Body, Depends
 import uvicorn
@@ -28,6 +30,11 @@ logger = logging.getLogger(__name__)
 github_token = os.environ.get("GITHUB_TOKEN")
 if not github_token:
     logger.warning("GITHUB_TOKEN not found in environment variables")
+
+# Get Anthropic API key for web search
+anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
+if not anthropic_api_key:
+    logger.warning("ANTHROPIC_API_KEY not found in environment variables")
 
 app = FastAPI(title="Linear-Bot")
 
@@ -242,10 +249,42 @@ async def handle_webhook(request: Request, data: dict = Body(...)):
         
         # Now run the agent on the new branch
         query = format_linear_message(event.title, event.description)
-        agent = CodeAgent(codebase)
         
-        logger.info("Running agent...")
-        agent.run(query)
+        # Initialize web search tool if API key is available
+        tools = []
+        if anthropic_api_key:
+            log_agent_progress("Adding custom tools to CodeAgent", linear_client, linear_issue_id)
+            
+            # Add our custom web search tool which now uses web_search.py
+            try:
+                custom_web_search = CustomWebSearchTool(api_key=anthropic_api_key)
+                tools.append(custom_web_search)
+                log_agent_progress("Added CustomWebSearchTool for internet search with content retrieval", linear_client, linear_issue_id)
+            except Exception as e:
+                logger.warning(f"Failed to initialize CustomWebSearchTool: {str(e)}")
+            
+            # Add our custom documentation tool
+            try:
+                custom_docs = CustomDocumentationTool(api_key=anthropic_api_key)
+                tools.append(custom_docs)
+                log_agent_progress("Added CustomDocumentationTool for fetching library documentation", linear_client, linear_issue_id)
+            except Exception as e:
+                logger.warning(f"Failed to initialize CustomDocumentationTool: {str(e)}")
+        else:
+            log_agent_progress("Custom tools not added - ANTHROPIC_API_KEY not available", linear_client, linear_issue_id)
+        
+        # Initialize the agent with tools
+        # We can't directly pass tools to CodeAgent, so we'll use create_agent_with_tools instead
+        agent_with_tools = create_agent_with_tools(codebase, tools)
+        
+        log_agent_progress(f"Running agent with {len(tools)} additional tools...", linear_client, linear_issue_id)
+        log_agent_progress(f"Tools enabled: {[tool.__class__.__name__ for tool in tools]}", linear_client, linear_issue_id)
+        log_agent_progress("Starting to analyze the codebase and implement the requested changes...", linear_client, linear_issue_id)
+        
+        # Run the agent
+        agent_with_tools.invoke({"input": query}, config={"configurable": {"session_id": event.identifier}})
+        
+        log_agent_progress("Agent has completed its run. Checking for changes...", linear_client, linear_issue_id)
         
         # Check if any changes were made by the agent
         try:
@@ -270,31 +309,31 @@ async def handle_webhook(request: Request, data: dict = Body(...)):
             
             try:
                 # First try to use the SDK's create_pr function
-                logger.info("Attempting to create PR using SDK")
+                log_agent_progress("Attempting to create PR using SDK", linear_client, linear_issue_id)
                 create_pr_result = create_pr(codebase, pr_title, pr_body)
                 
                 if hasattr(create_pr_result, 'url') and create_pr_result.url:
-                    logger.info(f"PR created successfully: {create_pr_result.url}")
+                    log_agent_progress(f"PR created successfully: {create_pr_result.url}", linear_client, linear_issue_id)
                     
                     try:
                         linear_client.comment_on_issue(linear_issue_id, f"I've finished running, please review the PR: {create_pr_result.url}")
                     except Exception as e:
                         logger.error(f"Error commenting on issue with PR link: {str(e)}")
                 else:
-                    logger.error(f"PR creation failed: PR result object doesn't have a valid URL. Result: {create_pr_result}")
+                    log_agent_progress(f"PR creation failed: PR result object doesn't have a valid URL. Result: {create_pr_result}", linear_client, linear_issue_id)
                     
                     # Try manual PR creation as fallback
-                    logger.info("Attempting manual PR creation as fallback")
+                    log_agent_progress("Attempting manual PR creation as fallback", linear_client, linear_issue_id)
                     manual_pr_result = manually_create_pr(repo_dir, branch_name, pr_title, pr_body)
                     
                     if manual_pr_result.get("url"):
-                        logger.info(f"Manual PR created successfully: {manual_pr_result['url']}")
+                        log_agent_progress(f"Manual PR created successfully: {manual_pr_result['url']}", linear_client, linear_issue_id)
                         try:
                             linear_client.comment_on_issue(linear_issue_id, f"I've finished running, please review the PR: {manual_pr_result['url']}")
                         except Exception as e:
                             logger.error(f"Error commenting on issue with manual PR link: {str(e)}")
                     else:
-                        logger.error(f"Manual PR creation failed: {manual_pr_result.get('error')}")
+                        log_agent_progress(f"Manual PR creation failed: {manual_pr_result.get('error')}", linear_client, linear_issue_id)
                         try:
                             linear_client.comment_on_issue(linear_issue_id, f"I encountered an error while creating the PR: {manual_pr_result.get('error')}")
                         except Exception as comment_error:
@@ -304,17 +343,17 @@ async def handle_webhook(request: Request, data: dict = Body(...)):
                 logger.error(f"Full error details: {e}")
                 
                 # Try manual PR creation as fallback
-                logger.info("Attempting manual PR creation as fallback after exception")
+                log_agent_progress("Attempting manual PR creation as fallback after exception", linear_client, linear_issue_id)
                 manual_pr_result = manually_create_pr(repo_dir, branch_name, pr_title, pr_body)
                 
                 if manual_pr_result.get("url"):
-                    logger.info(f"Manual PR created successfully: {manual_pr_result['url']}")
+                    log_agent_progress(f"Manual PR created successfully: {manual_pr_result['url']}", linear_client, linear_issue_id)
                     try:
                         linear_client.comment_on_issue(linear_issue_id, f"I've finished running, please review the PR: {manual_pr_result['url']}")
                     except Exception as e:
                         logger.error(f"Error commenting on issue with manual PR link: {str(e)}")
                 else:
-                    logger.error(f"Manual PR creation failed: {manual_pr_result.get('error')}")
+                    log_agent_progress(f"Manual PR creation failed: {manual_pr_result.get('error')}", linear_client, linear_issue_id)
                     try:
                         linear_client.comment_on_issue(linear_issue_id, f"I encountered an error while creating the PR: {manual_pr_result.get('error')}")
                     except Exception as comment_error:

@@ -1,5 +1,5 @@
 from codegen import Codebase, ProgrammingLanguage
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Callable
 from codegen.sdk.codebase.config import CodebaseConfig
 from data import LinearLabels, LinearIssueUpdateEvent
 import os
@@ -8,10 +8,35 @@ import tempfile
 import subprocess
 import requests
 import json
+import time
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def log_agent_progress(message: str, linear_client=None, issue_id: Optional[str] = None):
+    """
+    Log the agent's progress and optionally comment on the Linear issue.
+    
+    Args:
+        message: The message to log.
+        linear_client: The Linear client to use for commenting on the issue.
+        issue_id: The ID of the Linear issue to comment on.
+    """
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    log_message = f"[{timestamp}] {message}"
+    
+    # Log to the console
+    logger.info(log_message)
+    
+    # Comment on the Linear issue if a client and issue ID are provided
+    if linear_client and issue_id:
+        try:
+            linear_client.comment_on_issue(issue_id, message)
+            logger.info(f"Commented on Linear issue {issue_id}")
+        except Exception as e:
+            logger.error(f"Error commenting on Linear issue: {str(e)}")
 
 
 def process_update_event(event_data: dict[str, Any]):
@@ -59,13 +84,22 @@ def format_linear_message(title: str, description: str | None = "") -> str:
     
     Your task is to:
     1. Understand the requirements in the issue
-    2. Make necessary code changes to implement the requirements
-    3. Create a pull request with your changes
+    2. Research any necessary documentation or information using web search when needed
+    3. Review the relevant parts of the codebase to understand the existing implementation
+    4. Make necessary code changes to implement the requirements
+    5. Create a pull request with your changes
     
     IMPORTANT: You MUST make changes to the codebase to implement the requirements. Do not just analyze without making changes.
     
     Use your tools to query the codebase for more context. When applicable include references to files and line numbers.
-    Code snippets are also encouraged. Make sure to create a pull request with your changes.
+    If you need to research documentation, APIs, or best practices, use the web search tool to find relevant information.
+    
+    For each step of your implementation:
+    1. Log your thought process and decisions
+    2. Use web search when you need to find documentation or examples
+    3. Explain your changes with code snippets and references
+    
+    Make sure to create a pull request with your changes when you're done.
     """
 
 
